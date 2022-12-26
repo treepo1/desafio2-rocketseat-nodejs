@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const errors = require("./errors");
 
 const { v4: uuidv4, validate } = require('uuid');
 
@@ -10,19 +11,80 @@ app.use(cors());
 const users = [];
 
 function checksExistsUserAccount(request, response, next) {
-  // Complete aqui
+  const { username } = request.headers; 
+
+  const user = users.find(user => user.username === username);
+
+  if(!user) {
+    response.status(404).json({error:errors.USER.NOTEXISTENT});
+    return;
+  }
+
+  request.user = user;
+  
+  next();
 }
 
 function checksCreateTodosUserAvailability(request, response, next) {
-  // Complete aqui
+  const user = request.user;
+
+  const isInFreePlan = !user.pro;
+  const isProPlan = user.pro;
+  const hasRemainingTodos = user.todos.length < 10;
+
+  if((isInFreePlan && hasRemainingTodos) || isProPlan) {
+    next();
+  } else {
+    response.status(403).json({error:errors.PLAN.OUTFREELIMITS});
+    return;
+  }
+
 }
 
 function checksTodoExists(request, response, next) {
-  // Complete aqui
+  const { username } = request.headers;
+  const { id } = request.params;
+
+  const isUUID = validate(id);
+
+  const user = users.find(user => user.username === username);
+
+    if(!user) {
+      response.status(404).json({error:errors.USER.NOTEXISTENT});
+      return;
+    }
+
+    if(!isUUID) {
+      response.status(400).json({error:errors.TODOS.IDNOTVALID});
+      return;
+    }
+
+    const todo = user.todos.find(todo => todo.id === id);
+
+    if(!todo) {
+      response.status(404).json({error: errors.TODOS.NOTEXISTENT});
+      return;
+    }
+
+    request.user = user;
+    request.todo = todo;
+    next(); 
+  
 }
 
 function findUserById(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+
+  const user = users.find(user => user.id === id);
+
+  if(!user) {
+    response.status(404).json({error: errors.USER.NOTEXISTENT});
+    return;
+  }
+
+  request.user = user;
+
+  next();
 }
 
 app.post('/users', (request, response) => {
